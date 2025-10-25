@@ -1,0 +1,10 @@
+# Ignore env file & cache
+key.env
+.env
+__pycache__/
+*.pyc
+.streamlit/
+
+# VSCode / PyCharm
+.vscode/
+.idea/
