@@ -4,6 +4,7 @@ import gspread
 from dotenv import load_dotenv
 from datetime import datetime
 import os
+import base64
 
 # --- Load biến môi trường ---
 load_dotenv("key.env")
@@ -21,7 +22,7 @@ SYSTEM_CONTEXT = (
     "Nếu em hỏi ngoài chủ đề, hãy nhẹ nhàng hướng về chủ đề học tập.\n"
 )
 
-# --- Kết nối Google Sheet ---
+# --- Kết nối Google Sheets ---
 def connect_sheet():
     try:
         gc = gspread.service_account(filename="key.json")
@@ -33,7 +34,6 @@ def connect_sheet():
 
 sheet = connect_sheet()
 
-# --- Hàm lưu lịch sử ---
 def save_to_sheet(name, question, answer):
     try:
         if sheet:
@@ -44,26 +44,17 @@ def save_to_sheet(name, question, answer):
     except Exception as e:
         st.warning(f"⚠️ Không thể lưu lịch sử: {e}")
 
-# --- Hàm xử lý sinh nội dung ---
-def ask_gemini(prompt):
-    try:
-        model = genai.GenerativeModel(
-            "gemini-2.5-flash",
-            generation_config=genai.GenerationConfig(
-                max_output_tokens=200,
-                temperature=0.6,
-            ),
-            system_instruction=SYSTEM_CONTEXT
-        )
-        response = model.generate_content(prompt)
-        if hasattr(response, "text") and response.text:
-            return response.text
-        else:
-            return "Cô chưa nghe rõ câu hỏi của em, con nói lại nha 💬"
-    except Exception as e:
-        return f"⚠️ Có lỗi khi gọi Gemini API: {e}"
+# --- Tạo hàm đọc ảnh base64 để nhúng vào CSS ---
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img:
+        encoded = base64.b64encode(img.read()).decode()
+    return f"data:image/jpg;base64,{encoded}"
 
-# --- Giao diện Streamlit ---
+# --- Đường dẫn ảnh trong thư mục chính ---
+bg_login = get_base64_image("bg_login.jpg")
+bg_chat = get_base64_image("bg_chat.jpg")
+
+# --- Cấu hình trang ---
 st.set_page_config(page_title="💬 Trợ lý ảo của cô Uyên", page_icon="🧠", layout="centered")
 
 # --- Nếu chưa nhập tên học sinh ---
@@ -72,7 +63,7 @@ if "student_name" not in st.session_state:
         f"""
         <style>
         .stApp {{
-            background-image: url("assets/bg_login.jpg");
+            background-image: url("{bg_login}");
             background-size: cover;
             background-position: center;
         }}
@@ -90,13 +81,14 @@ if "student_name" not in st.session_state:
             st.rerun()
         else:
             st.warning("Em quên nhập tên rồi kìa 🌼")
+
 else:
     # --- Trang chatbot ---
     st.markdown(
         f"""
         <style>
         .stApp {{
-            background-image: url("assets/bg_chat.jpg");
+            background-image: url("{bg_chat}");
             background-size: cover;
             background-position: center;
         }}
@@ -117,19 +109,33 @@ else:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Hiển thị lịch sử chat
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Ô nhập tin nhắn
     if prompt := st.chat_input("Em muốn hỏi gì nè? 💬"):
         st.chat_message("user").markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         with st.chat_message("assistant"):
             placeholder = st.empty()
-            reply = ask_gemini(prompt)
+            try:
+                model = genai.GenerativeModel(
+                    "gemini-2.5-flash",
+                    generation_config=genai.GenerationConfig(
+                        max_output_tokens=200,
+                        temperature=0.6,
+                    ),
+                    system_instruction=SYSTEM_CONTEXT
+                )
+                response = model.generate_content(prompt)
+                if hasattr(response, "text") and response.text:
+                    reply = response.text
+                else:
+                    reply = "Cô chưa nghe rõ câu hỏi của em, con nói lại nha 💬"
+            except Exception as e:
+                reply = f"⚠️ Có lỗi khi gọi Gemini API: {e}"
+
             placeholder.markdown(reply)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
