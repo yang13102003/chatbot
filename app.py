@@ -146,13 +146,13 @@ elif page == "📜 Lịch sử trò chuyện":
         else:
             df = pd.DataFrame(records)
             df['Thời gian'] = pd.to_datetime(df['Thời gian'], errors='coerce')  # 👈 Sửa lỗi định dạng ngày
-            df = df[df["Tên học sinh"].str.lower() == st.session_state.student_name.lower()]
+            df = df[df["Học sinh"].str.lower() == st.session_state.student_name.lower()]
             df = df.sort_values(by="Thời gian", ascending=False)
 
             if df.empty:
                 st.info("🙋 Em chưa có buổi học nào được ghi lại.")
             else:
-                st.dataframe(df[["Thời gian", "Câu hỏi", "Trả lời"]], use_container_width=True)
+                st.dataframe(df[["Thời gian", "Câu hỏi", "Câu trả lời"]], use_container_width=True)
 
                 # Nút tải lịch sử
                 csv_data = df.to_csv(index=False).encode('utf-8')
@@ -160,3 +160,4 @@ elif page == "📜 Lịch sử trò chuyện":
 
     except Exception as e:
         st.error(f"⚠️ Không thể tải lịch sử: {e}")
+
