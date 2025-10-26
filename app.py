@@ -114,7 +114,7 @@ if prompt := st.chat_input("Nhập tin nhắn để nói chuyện với cô 💬
         reply = response.text.strip() if response.text else "⚠️ Cô chưa nghe rõ câu hỏi, em nói lại giúp cô nhé!"
     except Exception as e:
         reply = f"⚠️ Có lỗi khi gọi Gemini API: {e}"
-        model_name = "gemini-2.5-pro"
+        model_name = "gemini-2.5-flash-lite"
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(f"{SYSTEM_CONTEXT}\nHọc sinh hỏi: {prompt}")
@@ -138,3 +138,4 @@ if prompt := st.chat_input("Nhập tin nhắn để nói chuyện với cô 💬
         ])
     except Exception as e:
         st.warning(f"⚠️ Không thể lưu vào Google Sheet: {e}")
+
