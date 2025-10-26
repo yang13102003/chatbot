@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 from datetime import datetime
 import os
 import base64
+import json
+
+service_account_info = json.loads(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
 
 # --- Load biến môi trường ---
 load_dotenv("key.env")
@@ -25,7 +28,7 @@ SYSTEM_CONTEXT = (
 # --- Kết nối Google Sheets ---
 def connect_sheet():
     try:
-        gc = gspread.service_account(filename="key.json")
+        gc = gspread.service_account_from_dict(service_account_info)
         sh = gc.open_by_key(sheet_key)
         return sh.sheet1
     except Exception as e:
@@ -140,3 +143,4 @@ else:
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
         save_to_sheet(st.session_state.student_name, prompt, reply)
+
