@@ -130,6 +130,8 @@ if page == "💬 Trò chuyện":
 
 # ===================== TRANG 2: LỊCH SỬ =====================
 elif page == "📜 Lịch sử trò chuyện":
+    import io
+    import pandas as pd
     apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/main/images/bg_login.jpg")
 
     st.markdown(f"""
@@ -139,7 +141,7 @@ elif page == "📜 Lịch sử trò chuyện":
     </div>
     """, unsafe_allow_html=True)
 
-    # Chế độ xem
+    # Chọn chế độ xem
     view_mode = st.radio("Chọn chế độ xem:", ["📖 Của em", "👩‍🏫 Tất cả học sinh"])
 
     try:
@@ -147,7 +149,6 @@ elif page == "📜 Lịch sử trò chuyện":
         if not records:
             st.info("💤 Chưa có buổi học nào được ghi lại.")
         else:
-            import pandas as pd
             df = pd.DataFrame(records)
             df.columns = [col.strip().lower() for col in df.columns]
 
@@ -159,32 +160,51 @@ elif page == "📜 Lịch sử trò chuyện":
             # 🧩 Chuyển thời gian linh hoạt
             df[col_time] = pd.to_datetime(df[col_time].astype(str), errors='coerce', format='mixed')
 
-            # 🧩 Lọc theo chế độ xem
+            # 🧩 Lọc lịch sử
             if view_mode == "📖 Của em":
                 df = df[df[col_name].str.lower().str.strip() == st.session_state.student_name.lower().strip()]
             else:
                 st.success("👩‍🏫 Đang hiển thị lịch sử của tất cả học sinh.")
-            
+
             df = df.sort_values(by=col_time, ascending=False)
+
             if df.empty:
                 st.info("🙋 Không có lịch sử nào để hiển thị.")
             else:
-                # Định dạng lại thời gian hiển thị đẹp hơn
+                # 🧩 Định dạng lại thời gian
                 df[col_time] = df[col_time].dt.strftime("%Y-%m-%d %H:%M")
 
                 df_display = df[[col_time, col_name, col_question, col_answer]]
                 df_display.columns = ["Thời gian", "Học sinh", "Câu hỏi", "Câu trả lời"]
 
+                # Hiển thị bảng lịch sử
                 st.dataframe(df_display, use_container_width=True)
 
-                csv_data = df_display.to_csv(index=False).encode('utf-8')
+                # ===== 📥 Nút tải file CSV UTF-8 =====
+                csv_bytes = df_display.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
-                    "📥 Tải lịch sử (CSV)",
-                    csv_data,
-                    f"lich_su_tro_chuyen.csv",
-                    "text/csv"
+                    "📄 Tải CSV (UTF-8, tiếng Việt chuẩn)",
+                    csv_bytes,
+                    file_name="lich_su_tro_chuyen.csv",
+                    mime="text/csv"
+                )
+
+                # ===== 📗 Nút tải file Excel =====
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+                    df_display.to_excel(writer, index=False, sheet_name="Lich_su")
+                    ws = writer.sheets["Lich_su"]
+                    ws.set_column("A:A", 20)
+                    ws.set_column("B:B", 18)
+                    ws.set_column("C:C", 40)
+                    ws.set_column("D:D", 60)
+                buffer.seek(0)
+                st.download_button(
+                    "📘 Tải Excel (.xlsx)",
+                    data=buffer,
+                    file_name="lich_su_tro_chuyen.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
 
     except Exception as e:
         st.error(f"⚠️ Không thể tải lịch sử: {e}")
-
