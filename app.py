@@ -1,141 +1,136 @@
 import streamlit as st
-from openai import OpenAI
-import os
+import google.generativeai as genai
+import gspread
 from dotenv import load_dotenv
+from datetime import datetime
+import os
 
-# --- Load API key ---
-load_dotenv(dotenv_path="key.env")  # ⚠️ chỉ rõ tên file .env của bạn
-api_key = os.getenv("OPENAI_API_KEY")
+# --- Load biến môi trường ---
+load_dotenv("key.env")
+api_key = os.getenv("GEMINI_API_KEY")
+sheet_key = os.getenv("GOOGLE_SHEET_KEY")
 
-# --- Kết nối OpenAI ---
-client = OpenAI(api_key=api_key)
+# --- Cấu hình Gemini ---
+genai.configure(api_key=api_key)
 
-# --- Cấu hình giao diện ---
-st.set_page_config(page_title="Uyên ChatGPT 🤖", page_icon="💬", layout="wide")
+SYSTEM_CONTEXT = (
+    "Bạn là Trợ lý ảo học tập thân thiện của cô giáo Đặng Tố Uyên. 🌼\n"
+    "Bạn xưng 'cô' và gọi học sinh là 'em'.\n"
+    "Luôn trả lời ngắn gọn, rõ ràng, dễ hiểu, thân thiện và tích cực.\n"
+    "Chủ đề chính: giảng dạy Tin học lớp 3 (máy tính, chuột, bàn phím, phần mềm đơn giản...).\n"
+    "Nếu em hỏi ngoài chủ đề, hãy nhẹ nhàng hướng về chủ đề học tập.\n"
+)
 
-# --- CSS Tùy chỉnh ---
-st.markdown("""
-<style>
-/* Toàn trang - nền + font */
-[data-testid="stAppViewContainer"] {
-    background: url("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1740&q=80")
-                no-repeat center center fixed;
-    background-size: cover;
-    font-family: 'Segoe UI', sans-serif;
-    color: #ffffff;
-}
+# --- Kết nối Google Sheet ---
+def connect_sheet():
+    try:
+        gc = gspread.service_account(filename="key.json")
+        sh = gc.open_by_key(sheet_key)
+        return sh.sheet1
+    except Exception as e:
+        st.error(f"⚠️ Không thể kết nối Google Sheet: {e}")
+        return None
 
-/* Hiệu ứng overlay làm mờ */
-[data-testid="stAppViewContainer"]::before {
-    content: "";
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.65);
-    z-index: 0;
-}
+sheet = connect_sheet()
 
-/* Vùng nội dung chính */
-.block-container {
-    position: relative;
-    z-index: 2;
-    padding-top: 1rem;
-}
+# --- Hàm lưu lịch sử ---
+def save_to_sheet(name, question, answer):
+    try:
+        if sheet:
+            sheet.append_row([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                name, question, answer
+            ])
+    except Exception as e:
+        st.warning(f"⚠️ Không thể lưu lịch sử: {e}")
 
-/* Khung chat */
-[data-testid="stChatMessage"] {
-    background-color: rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 12px;
-    margin-bottom: 10px;
-    backdrop-filter: blur(10px);
-}
-
-/* Ô nhập chat */
-[data-testid="stChatInput"] textarea {
-    background-color: rgba(255,255,255,0.1);
-    color: #fff;
-    border-radius: 8px;
-}
-
-/* Tiêu đề */
-h1, h2, h3, h4 {
-    color: #00ffff !important;
-    text-align: center;
-}
-
-/* Floating icons animation */
-@keyframes float {
-    0% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
-    50% { transform: translateY(-20px) rotate(10deg); opacity: 1; }
-    100% { transform: translateY(0px) rotate(-10deg); opacity: 0.8; }
-}
-.floating-icon {
-    position: fixed;
-    font-size: 24px;
-    color: #00ffff;
-    opacity: 0.15;
-    animation: float 6s ease-in-out infinite;
-    z-index: 1;
-}
-#icon1 { top: 10%; left: 5%; animation-delay: 0s; }
-#icon2 { top: 30%; right: 10%; animation-delay: 2s; }
-#icon3 { bottom: 20%; left: 10%; animation-delay: 4s; }
-#icon4 { top: 60%; right: 20%; animation-delay: 1s; }
-#icon5 { bottom: 10%; right: 5%; animation-delay: 3s; }
-
-/* Thanh cuộn */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-thumb { background: #00ffff; border-radius: 4px; }
-</style>
-
-<!-- Các icon bay quanh giao diện -->
-<div id="icon1" class="floating-icon">💻</div>
-<div id="icon2" class="floating-icon">⚙️</div>
-<div id="icon3" class="floating-icon">💡</div>
-<div id="icon4" class="floating-icon">🧠</div>
-<div id="icon5" class="floating-icon">💾</div>
-""", unsafe_allow_html=True)
-
-# --- Header đẹp ---
-col1, col2 = st.columns([1,4])
-with col1:
-    st.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=80)
-with col2:
-    st.markdown("<h1 style='margin-bottom:0;'>Uyên ChatGPT 🤖</h1>", unsafe_allow_html=True)
-    st.caption("Trợ lý AI phong cách ChatGPT – nền tùy chỉnh, hiệu ứng công nghệ ✨")
-
-# --- Nút xóa hội thoại ---
-if st.button("🗑️ Xóa hội thoại"):
-    st.session_state.messages = []
-    st.experimental_rerun()
-
-# --- Bộ nhớ hội thoại ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# --- Hiển thị lịch sử ---
-for msg in st.session_state.messages:
-    avatar = "🧑‍💻" if msg["role"] == "user" else "🤖"
-    with st.chat_message(msg["role"], avatar=avatar):
-        st.markdown(msg["content"])
-
-# --- Input người dùng ---
-if prompt := st.chat_input("Nhập tin nhắn của bạn..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user", avatar="🧑‍💻").markdown(prompt)
-
-    with st.chat_message("assistant", avatar="🤖"):
-        placeholder = st.empty()
-        full_response = ""
-        stream = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=st.session_state.messages,
-            stream=True,
+# --- Hàm xử lý sinh nội dung ---
+def ask_gemini(prompt):
+    try:
+        model = genai.GenerativeModel(
+            "gemini-2.5-flash",
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=200,
+                temperature=0.6,
+            ),
+            system_instruction=SYSTEM_CONTEXT
         )
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                full_response += chunk.choices[0].delta.content
-                placeholder.markdown(full_response + "▌")
-        placeholder.markdown(full_response)
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+        response = model.generate_content(prompt)
+        if hasattr(response, "text") and response.text:
+            return response.text
+        else:
+            return "Cô chưa nghe rõ câu hỏi của em, con nói lại nha 💬"
+    except Exception as e:
+        return f"⚠️ Có lỗi khi gọi Gemini API: {e}"
+
+# --- Giao diện Streamlit ---
+st.set_page_config(page_title="💬 Trợ lý ảo của cô Uyên", page_icon="🧠", layout="centered")
+
+# --- Nếu chưa nhập tên học sinh ---
+if "student_name" not in st.session_state:
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("assets/bg_login.jpg");
+            background-size: cover;
+            background-position: center;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    st.title("🎓 Xin chào học sinh thân mến!")
+    st.subheader("Cô Uyên rất vui được gặp em 💻")
+
+    name = st.text_input("Em hãy nhập tên của mình để bắt đầu học nhé:")
+    if st.button("Bắt đầu học 👋"):
+        if name.strip():
+            st.session_state.student_name = name.strip()
+            st.rerun()
+        else:
+            st.warning("Em quên nhập tên rồi kìa 🌼")
+else:
+    # --- Trang chatbot ---
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("assets/bg_chat.jpg");
+            background-size: cover;
+            background-position: center;
+        }}
+        .stChatMessage {{
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 15px;
+            padding: 10px;
+            margin: 5px;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.title(f"💬 Cô Uyên cùng trò chuyện với em {st.session_state.student_name} 🌼")
+    st.caption("(Trợ lý ảo học tập – chủ đề Tin học lớp 3)")
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Hiển thị lịch sử chat
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Ô nhập tin nhắn
+    if prompt := st.chat_input("Em muốn hỏi gì nè? 💬"):
+        st.chat_message("user").markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        with st.chat_message("assistant"):
+            placeholder = st.empty()
+            reply = ask_gemini(prompt)
+            placeholder.markdown(reply)
+
+        st.session_state.messages.append({"role": "assistant", "content": reply})
+        save_to_sheet(st.session_state.student_name, prompt, reply)
