@@ -134,29 +134,56 @@ elif page == "📜 Lịch sử trò chuyện":
 
     st.markdown(f"""
     <div class='title-box'>
-        <h1>📜 Lịch sử trò chuyện của {st.session_state.student_name}</h1>
-        <p>Xem lại các buổi học trước nhé 🌼</p>
+        <h1>📜 Lịch sử trò chuyện</h1>
+        <p>Xem lại các buổi học đã ghi vào Google Sheet 🌼</p>
     </div>
     """, unsafe_allow_html=True)
+
+    # Chế độ xem
+    view_mode = st.radio("Chọn chế độ xem:", ["📖 Của em", "👩‍🏫 Tất cả học sinh"])
 
     try:
         records = worksheet.get_all_records()
         if not records:
             st.info("💤 Chưa có buổi học nào được ghi lại.")
         else:
+            import pandas as pd
             df = pd.DataFrame(records)
-            df['Thời gian'] = pd.to_datetime(df['Thời gian'], errors='coerce')  # 👈 Sửa lỗi định dạng ngày
-            df = df[df["Học sinh"].str.lower() == st.session_state.student_name.lower()]
-            df = df.sort_values(by="Thời gian", ascending=False)
+            df.columns = [col.strip().lower() for col in df.columns]
 
-            if df.empty:
-                st.info("🙋 Em chưa có buổi học nào được ghi lại.")
+            col_time = next((c for c in df.columns if "thời" in c or "time" in c), None)
+            col_name = next((c for c in df.columns if "học" in c or "sinh" in c), None)
+            col_question = next((c for c in df.columns if "câu" in c or "question" in c), None)
+            col_answer = next((c for c in df.columns if "trả" in c or "answer" in c), None)
+
+            # 🧩 Chuyển thời gian linh hoạt
+            df[col_time] = pd.to_datetime(df[col_time].astype(str), errors='coerce', format='mixed')
+
+            # 🧩 Lọc theo chế độ xem
+            if view_mode == "📖 Của em":
+                df = df[df[col_name].str.lower().str.strip() == st.session_state.student_name.lower().strip()]
             else:
-                st.dataframe(df[["Thời gian", "Câu hỏi", "Câu trả lời"]], use_container_width=True)
+                st.success("👩‍🏫 Đang hiển thị lịch sử của tất cả học sinh.")
+            
+            df = df.sort_values(by=col_time, ascending=False)
+            if df.empty:
+                st.info("🙋 Không có lịch sử nào để hiển thị.")
+            else:
+                # Định dạng lại thời gian hiển thị đẹp hơn
+                df[col_time] = df[col_time].dt.strftime("%Y-%m-%d %H:%M")
 
-                # Nút tải lịch sử
-                csv_data = df.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Tải lịch sử của em (CSV)", csv_data, f"lich_su_{st.session_state.student_name}.csv", "text/csv")
+                df_display = df[[col_time, col_name, col_question, col_answer]]
+                df_display.columns = ["Thời gian", "Học sinh", "Câu hỏi", "Câu trả lời"]
+
+                st.dataframe(df_display, use_container_width=True)
+
+                csv_data = df_display.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Tải lịch sử (CSV)",
+                    csv_data,
+                    f"lich_su_tro_chuyen.csv",
+                    "text/csv"
+                )
 
     except Exception as e:
         st.error(f"⚠️ Không thể tải lịch sử: {e}")
