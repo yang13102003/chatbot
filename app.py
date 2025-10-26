@@ -57,29 +57,28 @@ def apply_css(bg_image):
         </style>
     """, unsafe_allow_html=True)
 
-# ===================== THANH ĐIỀU HƯỚNG (SIDEBAR) =====================
+# ===================== TRANG ĐĂNG NHẬP =====================
+if "student_name" not in st.session_state:
+    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/main/images/bg_login.jpg")
+    st.markdown("<div class='title-box'><h1>🌸 Xin chào em! 🌸</h1><p>Nhập tên để cô Uyên biết em là ai nhé 💬</p></div>", unsafe_allow_html=True)
+    name = st.text_input("👧 Nhập tên của em:")
+    if st.button("Bắt đầu học 💻"):
+        if name.strip():
+            st.session_state.student_name = name.strip()
+            st.session_state.messages = []
+            st.session_state.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            st.session_state.page = "chat"
+            st.rerun()
+        else:
+            st.warning("Vui lòng nhập tên nha em 💡")
+    st.stop()
+
+# ===================== THANH ĐIỀU HƯỚNG =====================
 page = st.sidebar.radio("📚 Chọn trang", ["💬 Trò chuyện", "📜 Lịch sử trò chuyện"])
 
 # ===================== TRANG 1: TRÒ CHUYỆN =====================
 if page == "💬 Trò chuyện":
-
-    # Nếu học sinh chưa nhập tên → trang đăng nhập
-    if "student_name" not in st.session_state:
-        apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_login.jpg")
-        st.markdown("<div class='title-box'><h1>🌸 Xin chào em! 🌸</h1><p>Nhập tên để cô Uyên biết em là ai nhé 💬</p></div>", unsafe_allow_html=True)
-        name = st.text_input("👧 Nhập tên của em:")
-        if st.button("Bắt đầu học 💻"):
-            if name.strip():
-                st.session_state.student_name = name.strip()
-                st.session_state.messages = []
-                st.session_state.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-                st.rerun()
-            else:
-                st.warning("Vui lòng nhập tên nha em 💡")
-        st.stop()
-
-    # Giao diện chatbot
-    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_chat.jpg")
+    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/main/images/bg_chat.jpg")
 
     st.markdown(f"""
     <div class='title-box'>
@@ -129,11 +128,16 @@ if page == "💬 Trò chuyện":
         except Exception as e:
             st.warning(f"⚠️ Không thể lưu vào Google Sheet: {e}")
 
-# ===================== TRANG 2: XEM LỊCH SỬ =====================
+# ===================== TRANG 2: LỊCH SỬ =====================
 elif page == "📜 Lịch sử trò chuyện":
-    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_login.jpg")
+    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/main/images/bg_login.jpg")
 
-    st.markdown("<div class='title-box'><h1>📜 Lịch sử trò chuyện</h1><p>Xem lại các buổi học trước nhé 🌼</p></div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class='title-box'>
+        <h1>📜 Lịch sử trò chuyện của {st.session_state.student_name}</h1>
+        <p>Xem lại các buổi học trước nhé 🌼</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     try:
         records = worksheet.get_all_records()
@@ -141,18 +145,18 @@ elif page == "📜 Lịch sử trò chuyện":
             st.info("💤 Chưa có buổi học nào được ghi lại.")
         else:
             df = pd.DataFrame(records)
-            df['Thời gian'] = pd.to_datetime(df['Thời gian'])
+            df['Thời gian'] = pd.to_datetime(df['Thời gian'], errors='coerce')  # 👈 Sửa lỗi định dạng ngày
+            df = df[df["Tên học sinh"].str.lower() == st.session_state.student_name.lower()]
             df = df.sort_values(by="Thời gian", ascending=False)
 
-            student_filter = st.text_input("🔍 Nhập tên học sinh để tìm:")
-            if student_filter:
-                df = df[df["Tên học sinh"].str.contains(student_filter, case=False)]
+            if df.empty:
+                st.info("🙋 Em chưa có buổi học nào được ghi lại.")
+            else:
+                st.dataframe(df[["Thời gian", "Câu hỏi", "Trả lời"]], use_container_width=True)
 
-            st.dataframe(df[["Thời gian", "Tên học sinh", "Câu hỏi", "Trả lời"]], use_container_width=True)
-
-            # Cho phép tải xuống lịch sử
-            csv_data = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Tải toàn bộ lịch sử (CSV)", csv_data, "lich_su_chat.csv", "text/csv")
+                # Nút tải lịch sử
+                csv_data = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Tải lịch sử của em (CSV)", csv_data, f"lich_su_{st.session_state.student_name}.csv", "text/csv")
 
     except Exception as e:
         st.error(f"⚠️ Không thể tải lịch sử: {e}")
