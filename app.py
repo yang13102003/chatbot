@@ -66,7 +66,7 @@ def apply_css(bg_image):
 
 # =============== TRANG NHẬP TÊN HỌC SINH ===============
 if "student_name" not in st.session_state:
-    apply_css("bg_login.jpg")
+    apply_css("https://drive.google.com/uc?export=view&id=1NaydE-AyThVLyT4LXm4eMZrJ0FthRl5j")
     st.markdown("<div class='title-box'><h1>🌸 Xin chào em! 🌸</h1><p>Nhập tên để cô Uyên biết em là ai nhé 💬</p></div>", unsafe_allow_html=True)
     name = st.text_input("👧 Nhập tên của em:")
     if st.button("Bắt đầu học 💻"):
@@ -79,7 +79,7 @@ if "student_name" not in st.session_state:
     st.stop()
 
 # =============== TRANG CHATBOT ===============
-apply_css("bg_chat.jpg")
+apply_css("https://drive.google.com/uc?export=view&id=1MQbh76loPEZM6VYIhgvHMEtHvxOSrxIf")
 
 st.markdown(f"""
 <div class='title-box'>
@@ -137,3 +137,4 @@ if prompt := st.chat_input("Nhập tin nhắn để nói chuyện với cô 💬
         ])
     except Exception as e:
         st.warning(f"⚠️ Không thể lưu vào Google Sheet: {e}")
+
