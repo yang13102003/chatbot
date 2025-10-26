@@ -3,6 +3,7 @@ import google.generativeai as genai
 import gspread
 import json
 from datetime import datetime
+import pandas as pd
 
 # ===================== CẤU HÌNH GOOGLE SHEET =====================
 service_account_info = json.loads(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
@@ -15,7 +16,7 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model_name = "gemini-2.5-flash"
 
 # ===================== CẤU HÌNH GIAO DIỆN TRANG =====================
-st.set_page_config(page_title="Cô Uyên cùng trò chuyện 🌸", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="Cô Uyên 🌸", page_icon="🤖", layout="centered")
 
 # ===================== CSS =====================
 def apply_css(bg_image):
@@ -41,13 +42,6 @@ def apply_css(bg_image):
             color: #003366;
             text-shadow: 1px 1px 2px white;
         }}
-        .stChatMessage {{
-            background: rgba(255, 255, 255, 0.85);
-            border-radius: 15px;
-            padding: 12px 18px;
-            margin: 8px 0;
-            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
-        }}
         .user-msg {{
             background-color: rgba(255, 255, 255, 0.8);
             border-left: 4px solid #6ec1e4;
@@ -63,79 +57,102 @@ def apply_css(bg_image):
         </style>
     """, unsafe_allow_html=True)
 
-# ===================== TRANG NHẬP TÊN HỌC SINH =====================
-if "student_name" not in st.session_state:
-    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_login.jpg")
-    st.markdown("<div class='title-box'><h1>🌸 Xin chào em! 🌸</h1><p>Nhập tên để cô Uyên biết em là ai nhé 💬</p></div>", unsafe_allow_html=True)
-    name = st.text_input("👧 Nhập tên của em:")
-    if st.button("Bắt đầu học 💻"):
-        if name.strip():
-            st.session_state.student_name = name.strip()
-            st.session_state.messages = []
-            st.rerun()
-        else:
-            st.warning("Vui lòng nhập tên nha em 💡")
-    st.stop()
+# ===================== THANH ĐIỀU HƯỚNG (SIDEBAR) =====================
+page = st.sidebar.radio("📚 Chọn trang", ["💬 Trò chuyện", "📜 Lịch sử trò chuyện"])
 
-# ===================== TRANG CHATBOT =====================
-apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_chat.jpg")
+# ===================== TRANG 1: TRÒ CHUYỆN =====================
+if page == "💬 Trò chuyện":
 
-st.markdown(f"""
-<div class='title-box'>
-    <h1>💬 Cô Uyên cùng trò chuyện với em {st.session_state.student_name} 🌼</h1>
-    <p>(Trợ lý ảo học tập – Chủ đề Tin học lớp 3)</p>
-</div>
-""", unsafe_allow_html=True)
+    # Nếu học sinh chưa nhập tên → trang đăng nhập
+    if "student_name" not in st.session_state:
+        apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_login.jpg")
+        st.markdown("<div class='title-box'><h1>🌸 Xin chào em! 🌸</h1><p>Nhập tên để cô Uyên biết em là ai nhé 💬</p></div>", unsafe_allow_html=True)
+        name = st.text_input("👧 Nhập tên của em:")
+        if st.button("Bắt đầu học 💻"):
+            if name.strip():
+                st.session_state.student_name = name.strip()
+                st.session_state.messages = []
+                st.session_state.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                st.rerun()
+            else:
+                st.warning("Vui lòng nhập tên nha em 💡")
+        st.stop()
 
-# ===================== CONTEXT CHO CHATBOT =====================
-SYSTEM_CONTEXT = (
-    "Bạn là Trợ lý học tập thân thiện của cô giáo Đặng Tố Uyên. "
-    "Xưng hô: cô và em. "
-    "Luôn nói ngắn gọn, dễ hiểu, dùng lời lẽ dịu dàng như đang dạy học sinh tiểu học. "
-    "Nếu học sinh hỏi về Tin học lớp 3, hãy giảng giải từng bước rõ ràng. "
-    "Nếu học sinh chào hỏi hoặc tâm sự, hãy phản hồi nhẹ nhàng, thân thiện. "
-    "Không nói về các chủ đề ngoài giáo dục hoặc không phù hợp với trẻ em."
-)
+    # Giao diện chatbot
+    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_chat.jpg")
 
-# ===================== HIỂN THỊ LỊCH SỬ CHAT =====================
-for msg in st.session_state.get("messages", []):
-    with st.chat_message(msg["role"]):
+    st.markdown(f"""
+    <div class='title-box'>
+        <h1>💬 Cô Uyên cùng trò chuyện với em {st.session_state.student_name} 🌼</h1>
+        <p>(Trợ lý học tập – Chủ đề Tin học lớp 3)</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    SYSTEM_CONTEXT = (
+        "Bạn là Trợ lý học tập thân thiện của cô giáo Đặng Tố Uyên. "
+        "Xưng hô: cô và em. "
+        "Luôn nói ngắn gọn, dễ hiểu, dùng lời lẽ dịu dàng như đang dạy học sinh tiểu học. "
+        "Nếu học sinh hỏi về Tin học lớp 3, hãy giảng giải từng bước rõ ràng. "
+        "Nếu học sinh chào hỏi hoặc tâm sự, hãy phản hồi nhẹ nhàng, thân thiện. "
+        "Không nói về các chủ đề ngoài giáo dục hoặc không phù hợp với trẻ em."
+    )
+
+    # Hiển thị lịch sử chat hiện tại
+    for msg in st.session_state.get("messages", []):
         css_class = "user-msg" if msg["role"] == "user" else "assistant-msg"
         st.markdown(f"<div class='{css_class}'>{msg['content']}</div>", unsafe_allow_html=True)
 
-# ===================== XỬ LÝ CÂU HỎI HỌC SINH =====================
-if prompt := st.chat_input("Nhập tin nhắn để nói chuyện với cô 💬"):
-    st.chat_message("user").markdown(f"<div class='user-msg'>{prompt}</div>", unsafe_allow_html=True)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # Học sinh nhập câu hỏi
+    if prompt := st.chat_input("Nhập tin nhắn để nói chuyện với cô 💬"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.markdown(f"<div class='user-msg'>{prompt}</div>", unsafe_allow_html=True)
 
-    try:
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(f"{SYSTEM_CONTEXT}\nHọc sinh hỏi: {prompt}")
-        reply = response.text.strip() if response.text else "⚠️ Cô chưa nghe rõ câu hỏi, em nói lại giúp cô nhé!"
-    except Exception as e:
-        reply = f"⚠️ Có lỗi khi gọi Gemini API: {e}"
-        model_name = "gemini-2.5-flash-lite"
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(f"{SYSTEM_CONTEXT}\nHọc sinh hỏi: {prompt}")
-            reply = response.text.strip() if response.text else "Cô vẫn chưa nhận được phản hồi, thử lại sau nha em 🌸"
-        except Exception as e2:
-            reply = f"⚠️ Model dự phòng cũng không trả kết quả.\nLỗi: {e2}"
+            reply = response.text.strip() if response.text else "⚠️ Cô chưa nghe rõ câu hỏi, em nói lại giúp cô nhé!"
+        except Exception as e:
+            reply = f"⚠️ Có lỗi khi gọi Gemini API: {e}"
 
-    with st.chat_message("assistant"):
         st.markdown(f"<div class='assistant-msg'>{reply}</div>", unsafe_allow_html=True)
+        st.session_state.messages.append({"role": "assistant", "content": reply})
 
-    # Lưu lịch sử chat
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+        # Lưu vào Google Sheet
+        try:
+            worksheet.append_row([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                st.session_state.student_name,
+                st.session_state.session_id,
+                prompt,
+                reply
+            ])
+        except Exception as e:
+            st.warning(f"⚠️ Không thể lưu vào Google Sheet: {e}")
 
-    # Lưu vào Google Sheet
+# ===================== TRANG 2: XEM LỊCH SỬ =====================
+elif page == "📜 Lịch sử trò chuyện":
+    apply_css("https://raw.githubusercontent.com/yang13102003/chatbot/15f09e7bc230d46c41721aff9409458b53155781/images/bg_login.jpg")
+
+    st.markdown("<div class='title-box'><h1>📜 Lịch sử trò chuyện</h1><p>Xem lại các buổi học trước nhé 🌼</p></div>", unsafe_allow_html=True)
+
     try:
-        worksheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            st.session_state.student_name,
-            prompt,
-            reply
-        ])
-    except Exception as e:
-        st.warning(f"⚠️ Không thể lưu vào Google Sheet: {e}")
+        records = worksheet.get_all_records()
+        if not records:
+            st.info("💤 Chưa có buổi học nào được ghi lại.")
+        else:
+            df = pd.DataFrame(records)
+            df['Thời gian'] = pd.to_datetime(df['Thời gian'])
+            df = df.sort_values(by="Thời gian", ascending=False)
 
+            student_filter = st.text_input("🔍 Nhập tên học sinh để tìm:")
+            if student_filter:
+                df = df[df["Tên học sinh"].str.contains(student_filter, case=False)]
+
+            st.dataframe(df[["Thời gian", "Tên học sinh", "Câu hỏi", "Trả lời"]], use_container_width=True)
+
+            # Cho phép tải xuống lịch sử
+            csv_data = df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Tải toàn bộ lịch sử (CSV)", csv_data, "lich_su_chat.csv", "text/csv")
+
+    except Exception as e:
+        st.error(f"⚠️ Không thể tải lịch sử: {e}")
